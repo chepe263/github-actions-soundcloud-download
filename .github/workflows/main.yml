@@ -49,8 +49,8 @@ jobs:
     - name: Prepare artifact directory
       if: always()
       run: |
-        mkdir -p artifact-preview
-        cp -r soundcloud-downloader/soundcloud-jsons/* artifact-preview/ 2>/dev/null || echo "No tracks to copy"
+        mkdir -p artifact-preview/soundcloud-json
+        cp -r soundcloud-downloader/soundcloud-jsons/* artifact-preview/soundcloud-json/ 2>/dev/null || echo "No tracks to copy"
     
     - name: Process playlists
       if: always()

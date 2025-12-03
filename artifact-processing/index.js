@@ -53,8 +53,14 @@ function pretty_playlist(description){
   
   let result = description;
   
+    // Trim extra space after 'DAT' in parentheses
+    result = result.replace(/\(Straight From DAT \)/g, '(Straight From DAT)');
+
   // Remove "Tracklist:" prefix if present
   result = result.replace(/^Tracklist:\s*/i, '');
+
+  // Normalize whitespace around dashes (e.g., "  -  " -> " - ")
+  result = result.replace(/\s+-\s+/g, ' - ');
   
   // Fix common misspellings in month tags (MOTNH -> MONTH)
   result = result.replace(/\[(TRACK|CLASSIC|RECORD)\s+OF\s+THE\s+MOTNH\]/gi, '[$1 OF THE MONTH]');
@@ -65,32 +71,33 @@ function pretty_playlist(description){
     (match, type) => `[${type.toUpperCase()} OF THE MONTH]`
   );
   
-  // Apply corrections from corrections.json
-  for (const [wrong, correct] of Object.entries(corrections)) {
-    result = result.replace(new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), correct);
-  }
   
-  // First regex: Format track numbers and add quotes around track titles
-  // Handles lines with parentheses or brackets (remix/label info)
-  // Check if parentheses contain remix keywords, otherwise include in title
+  // Improved regex: If artist or title contains ' - ', merge artist/title accordingly
   result = result.replace(
     /^(\d+)\s+(.*?)(\s?-\s?)(.*?)(\s+\((.*?)\))?(\s+\[)/gm,
     (match, num, artist, sep, title, parenPart, parenContent) => {
       // Normalize spaces and fix "ft" to "ft."
-      const cleanArtist = artist.replace(/\s+/g, ' ').replace(/\bft\.?\b/gi, 'ft.');
-      
-      // Check if parentheses contain remix/mix keywords
-      const remixKeywords = /\b(remix|mix|rework|edit|version|dub|remaster|update|bootleg|mashup|VIP)\b/i;
-      
+      let cleanArtist = artist.replace(/\s+/g, ' ').replace(/\bft\.?\b/gi, 'ft.');
+      let cleanTitle = title.trim();
+      // If artist ends with '-' and title starts with '-', merge
+      if (/^-/.test(cleanTitle) && /-$/.test(cleanArtist)) {
+        cleanArtist = cleanArtist.replace(/-$/, '').trim() + '-' + cleanTitle.replace(/^-/, '').trim();
+        cleanTitle = '';
+      } else if (/^-/.test(cleanTitle)) {
+        cleanArtist = cleanArtist + cleanTitle.replace(/^-/, '').trim();
+        cleanTitle = '';
+      }
+      // Check if parentheses contain remix/mix keywords, 'Straight From DAT', or 'New V'
+      const remixKeywords = /\b(remix|mix|rework|edit|version|dub|remaster|update|bootleg|mashup|VIP|RMX|Respray|Reprint)\b|Straight From DAT|New V/i;
       if (parenPart && remixKeywords.test(parenContent)) {
         // It's a remix - keep parentheses outside quotes
-        return `${num}. ${cleanArtist} - "${title.trim()}" ${parenPart.trim()} [`;
+        return `${num}. ${cleanArtist} - "${cleanTitle}" ${parenPart.trim()} [`;
       } else if (parenPart) {
         // Not a remix - include in title with space
-        return `${num}. ${cleanArtist} - "${title.trim()} ${parenPart.trim()}" [`;
+        return `${num}. ${cleanArtist} - "${cleanTitle} ${parenPart.trim()}" [`;
       } else {
         // No parentheses
-        return `${num}. ${cleanArtist} - "${title.trim()}" [`;
+        return `${num}. ${cleanArtist} - "${cleanTitle}" [`;
       }
     }
   );
@@ -111,18 +118,28 @@ function pretty_playlist(description){
     }
   );
   
-  // Move month tags to separate line before the track
-  result = result.replace(
-    /^(\d+\..*?)(\s*\[(TRACK|CLASSIC|RECORD) OF THE MONTH\])$/gm,
-    (match, trackLine, tag) => {
-      return `\n${tag.trim()}\n${trackLine}\n`;
+  // Move month tags to separate line before the track, and trim each line
+  // Find any line ending with [TRACK/CLASSIC/RECORD OF THE MONTH], extract the tag, and reformat
+  result = result.split('\n').map(line => {
+    const trimmedLine = line.trim();
+    const tagMatch = trimmedLine.match(/^(.+?)\s*(\[(TRACK|CLASSIC|RECORD) OF THE MONTH\])\s*$/i);
+    if (tagMatch) {
+      const trackLine = tagMatch[1].trim();
+      const tag = tagMatch[2].toUpperCase();
+      return `\n${tag}\n${trackLine}\n`;
     }
-  );
+    return trimmedLine;
+  }).join('\n');
+  
+  // Apply corrections from corrections.json
+  for (const [wrong, correct] of Object.entries(corrections)) {
+    result = result.replace(new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), correct);
+  }
   
   // Clean up any double blank lines
   result = result.replace(/\n\n\n+/g, '\n\n');
-  
-  return result;
+
+  return result.trim();
 }
 
 /**
@@ -136,14 +153,16 @@ function processPlaylists() {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  // Read all JSON files from artifact-preview
-  const files = fs.readdirSync(artifactDir)
-    .filter(file => file.endsWith('.json') && file !== '_summary.json');
+  // Read all JSON files from artifact-preview/soundcloud-json
+  const jsonDir = path.join(artifactDir, 'soundcloud-json');
+  const files = fs.existsSync(jsonDir)
+    ? fs.readdirSync(jsonDir).filter(file => file.endsWith('.json') && file !== '_summary.json')
+    : [];
 
-  console.log(`Processing ${files.length} files...\n`);
+  console.log(`Processing ${files.length} files from soundcloud-json...\n`);
 
   files.forEach(file => {
-    const filePath = path.join(artifactDir, file);
+    const filePath = path.join(jsonDir, file);
     const track = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     
     // Check if this is a "Best Of" episode
