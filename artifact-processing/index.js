@@ -53,7 +53,9 @@ function pretty_playlist(description){
   // Replace: $1. $2$3"$4"
   result = result.replace(
     /^(\d+)\s(.*)(\s-\s)(.*?)(?= \(| \[)/gm,
-    '$1. $2$3"$4"'
+    (match, num, artist, sep, title) => {
+      return `${num}. ${artist}${sep}"${title.trim()}"`;
+    }
   );
   
   // Second regex: Format track numbers for lines WITHOUT parentheses or brackets
