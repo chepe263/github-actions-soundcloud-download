@@ -113,9 +113,9 @@ function pretty_playlist(description){
   
   // Move month tags to separate line before the track
   result = result.replace(
-    /^(\d+\..*)(\s+\[(TRACK|CLASSIC|RECORD) OF THE MONTH\])$/gm,
+    /^(\d+\..*?)(\s*\[(TRACK|CLASSIC|RECORD) OF THE MONTH\])$/gm,
     (match, trackLine, tag) => {
-      return `\n${tag}\n${trackLine}`;
+      return `\n${tag.trim()}\n${trackLine}`;
     }
   );
   
