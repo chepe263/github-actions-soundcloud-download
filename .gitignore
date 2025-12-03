@@ -143,6 +143,7 @@ soundcloud-token-getter/client_id.txt
 soundcloud-downloader/soundcloud-jsons/
 artifact-preview/*
 !artifact-preview/.gitkeep
+playlists.zip
 
 # Act (local GitHub Actions testing)
 .actrc
