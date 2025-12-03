@@ -3,6 +3,13 @@ const path = require('path');
 
 const artifactDir = path.join(__dirname, '../artifact-preview');
 const outputDir = path.join(artifactDir, 'out-playlists');
+const correctionsPath = path.join(__dirname, 'corrections.json');
+
+// Load corrections dictionary
+let corrections = {};
+if (fs.existsSync(correctionsPath)) {
+  corrections = JSON.parse(fs.readFileSync(correctionsPath, 'utf8'));
+}
 
 // Month names for file naming
 const monthNames = [
@@ -44,24 +51,49 @@ ${permalink_url}`;
 function pretty_playlist(description){
   if (!description) return '';
   
-  // Remove "Tracklist:" prefix if present
-  let result = description.replace(/^Tracklist:\s*/i, '');
+  // Apply corrections from corrections.json
+  let result = description;
+  for (const [wrong, correct] of Object.entries(corrections)) {
+    result = result.replace(new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), correct);
+  }
   
-  // Handle inline [TRACK/CLASSIC OF THE MONTH] tags - move to separate line before the track
+  // Remove "Tracklist:" prefix if present
+  result = result.replace(/^Tracklist:\s*/i, '');
+  
+  // Normalize "OF THE MONTH" tag spacing first (handle multiple spaces)
   result = result.replace(
-    /^(\d+\s+.*?)(\s*)(\[(TRACK|CLASSIC) OF THE MONTH\])/gm,
+    /\[(TRACK|CLASSIC|RECORD)\s+OF\s+THE\s+MONTH\]/gi,
+    (match, type) => `[${type.toUpperCase()} OF THE MONTH]`
+  );
+  
+  // Handle inline [TRACK/CLASSIC/RECORD OF THE MONTH] tags - move to separate line before the track
+  result = result.replace(
+    /^(\d+\s+.*?)(\s*)(\[(TRACK|CLASSIC|RECORD) OF THE MONTH\])/gm,
     '$3\n$1'
   );
   
   // First regex: Format track numbers and add quotes around track titles
   // Handles lines with parentheses or brackets (remix/label info)
-  // Pattern: ^(\d+)\s(.*)(\s-\s|\s?-\s?)(.*?)(?= \(| \[)
+  // Check if parentheses contain remix keywords, otherwise include in title
   result = result.replace(
-    /^(\d+)\s+(.*?)(\s?-\s?)(.*?)(?= \(| \[)/gm,
-    (match, num, artist, sep, title) => {
+    /^(\d+)\s+(.*?)(\s?-\s?)(.*?)(\s+\((.*?)\))?(\s+\[)/gm,
+    (match, num, artist, sep, title, parenPart, parenContent) => {
       // Normalize spaces and fix "ft" to "ft."
       const cleanArtist = artist.replace(/\s+/g, ' ').replace(/\bft\.?\b/gi, 'ft.');
-      return `${num}. ${cleanArtist} - "${title.trim()}"`;
+      
+      // Check if parentheses contain remix/mix keywords
+      const remixKeywords = /\b(remix|mix|rework|edit|version|dub|remaster|update|bootleg|mashup|VIP)\b/i;
+      
+      if (parenPart && remixKeywords.test(parenContent)) {
+        // It's a remix - keep parentheses outside quotes
+        return `${num}. ${cleanArtist} - "${title.trim()}" ${parenPart.trim()} [`;
+      } else if (parenPart) {
+        // Not a remix - include in title with space
+        return `${num}. ${cleanArtist} - "${title.trim()} ${parenPart.trim()}" [`;
+      } else {
+        // No parentheses
+        return `${num}. ${cleanArtist} - "${title.trim()}" [`;
+      }
     }
   );
   
