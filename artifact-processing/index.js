@@ -74,10 +74,10 @@ function pretty_playlist(description){
   );
   
   // Third regex: Move [TRACK OF THE MONTH] and [CLASSIC OF THE MONTH] tags
-  // Pattern: (.*\n)(.*)(\s+)(\[(TRACK|CLASSIC) OF THE MONTH\])
+  // Pattern: (.*\n)(.*)(\s*)(\[(TRACK|CLASSIC) OF THE MONTH\])
   // Replace: $1\n$4\n$2\n
   result = result.replace(
-    /(.*\n)(.*)(\s+)(\[(TRACK|CLASSIC) OF THE MONTH\])/g,
+    /(.*\n)(.*)(\s*)(\[(TRACK|CLASSIC) OF THE MONTH\])/g,
     '$1\n$4\n$2\n'
   );
   
