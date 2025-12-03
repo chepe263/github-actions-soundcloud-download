@@ -54,7 +54,9 @@ function pretty_playlist(description){
   result = result.replace(
     /^(\d+)\s(.*)(\s-\s)(.*?)(?= \(| \[)/gm,
     (match, num, artist, sep, title) => {
-      return `${num}. ${artist}${sep}"${title.trim()}"`;
+      // Normalize spaces and fix "ft" to "ft."
+      const cleanArtist = artist.replace(/\s+/g, ' ').replace(/\bft\b/gi, 'ft.');
+      return `${num}. ${cleanArtist}${sep}"${title.trim()}"`;
     }
   );
   
@@ -67,7 +69,9 @@ function pretty_playlist(description){
     (match, num, artist, sep, title) => {
       // Only apply if not already formatted (no period after number and no quotes)
       if (!match.includes('"') && !match.match(/^\d+\./)) {
-        return `${num}. ${artist}${sep}"${title.trim()}"`;
+        // Normalize spaces and fix "ft" to "ft."
+        const cleanArtist = artist.replace(/\s+/g, ' ').replace(/\bft\b/gi, 'ft.');
+        return `${num}. ${cleanArtist}${sep}"${title.trim()}"`;
       }
       return match;
     }
