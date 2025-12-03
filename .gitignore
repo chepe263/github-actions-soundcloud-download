@@ -137,3 +137,13 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Generated output files
+soundcloud-token-getter/client_id.txt
+soundcloud-downloader/tracks/
+artifact-preview/*
+!artifact-preview/.gitkeep
+
+# Act (local GitHub Actions testing)
+.actrc
+.secrets

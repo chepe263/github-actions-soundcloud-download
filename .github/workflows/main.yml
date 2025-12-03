@@ -1,0 +1,65 @@
+name: Download SoundCloud Tracks
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+    inputs:
+      soundcloud_user:
+        description: 'SoundCloud username to download tracks from'
+        required: false
+        default: ''
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Install token getter dependencies
+      working-directory: ./soundcloud-token-getter
+      run: npm ci
+    
+    - name: Install Playwright Browsers
+      working-directory: ./soundcloud-token-getter
+      run: npx playwright install --with-deps webkit
+    
+    - name: Extract SoundCloud client_id
+      working-directory: ./soundcloud-token-getter
+      run: npm run get-token
+    
+    - name: Install downloader dependencies
+      working-directory: ./soundcloud-downloader
+      run: npm ci
+    
+    - name: Download track metadata
+      working-directory: ./soundcloud-downloader
+      env:
+        SOUNDCLOUD_USER: ${{ inputs.soundcloud_user || vars.SOUNDCLOUD_USER || 'euphonicsessions' }}
+      run: npm run download
+    
+    - name: Prepare artifact directory
+      run: |
+        mkdir -p artifact-preview
+        cp -r soundcloud-downloader/tracks/* artifact-preview/ || true
+        echo "Contents of artifact-preview:" 
+        ls -lah artifact-preview/
+        if [ -f "artifact-preview/_summary.json" ]; then
+          echo "Summary file contents:"
+          cat artifact-preview/_summary.json
+        fi
+    
+    - name: Upload tracks artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: soundcloud-tracks-${{ inputs.soundcloud_user || vars.SOUNDCLOUD_USER || 'default' }}-${{ github.run_number }}
+        path: soundcloud-downloader/tracks/
+        retention-days: 30
