@@ -1,0 +1,13 @@
+{
+  "name": "artifact-processing",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "cleanup": "rm -rf ../artifact-preview/out-playlists"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
