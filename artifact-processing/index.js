@@ -66,12 +66,6 @@ function pretty_playlist(description){
     (match, type) => `[${type.toUpperCase()} OF THE MONTH]`
   );
   
-  // Handle inline [TRACK/CLASSIC/RECORD OF THE MONTH] tags - move to separate line before the track
-  result = result.replace(
-    /^(\d+\s+.*?)(\s*)(\[(TRACK|CLASSIC|RECORD) OF THE MONTH\])/gm,
-    '$3\n$1'
-  );
-  
   // First regex: Format track numbers and add quotes around track titles
   // Handles lines with parentheses or brackets (remix/label info)
   // Check if parentheses contain remix keywords, otherwise include in title
@@ -111,14 +105,6 @@ function pretty_playlist(description){
       }
       return match;
     }
-  );
-  
-  // Third regex: Move [TRACK OF THE MONTH] and [CLASSIC OF THE MONTH] tags
-  // Pattern: (.*\n)(.*)(\s*)(\[(TRACK|CLASSIC) OF THE MONTH\])
-  // Replace: $1\n$4\n$2\n
-  result = result.replace(
-    /(.*\n)(.*)(\s*)(\[(TRACK|CLASSIC) OF THE MONTH\])/g,
-    '$1\n$4\n$2\n'
   );
   
   return result;
