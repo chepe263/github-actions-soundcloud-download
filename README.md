@@ -26,6 +26,11 @@ Perfect for backing up your SoundCloud descriptions, analyzing track metadata, o
 │   ├── download.js                 # Script to fetch track metadata
 │   ├── package.json                # Node.js dependencies
 │   └── tracks/                     # Downloaded track data (generated)
+├── artifact-preview/
+│   ├── .gitkeep                    # Preserves directory in git
+│   └── (track files)               # Local preview of downloaded tracks
+├── runner/
+│   └── package.json                # Test and cleanup scripts
 ├── setup-act/
 │   └── setup-act.sh                # Script to install 'act' for local testing
 └── README.md                       # This file
@@ -118,7 +123,7 @@ To specify which SoundCloud user's tracks to download:
 4. The workflow will use this automatically
 
 **Option 3: Hardcode in workflow file**
-Edit `.github/workflows/main.yml` and replace `YOUR_USERNAME_HERE` with the desired username.
+Edit `.github/workflows/main.yml` and change the default value to the desired username (currently set to `euphonicsessions`).
 
 #### Download the Artifact
 
@@ -133,32 +138,69 @@ After the workflow completes:
 
 To test the GitHub Actions workflow locally before pushing:
 
-1. Install `act`:
+1. Install and run via the runner scripts:
+```bash
+cd runner
+npm run cleanup      # Clean previous test files
+npm test            # Run workflow locally with act (--bind mode)
+```
+
+2. Or manually install `act`:
 ```bash
 ./setup-act/setup-act.sh
 ```
 
-2. Run the workflow:
+3. Run the workflow with bind mount:
 ```bash
-act
+act workflow_dispatch --bind --container-architecture linux/amd64
 ```
 
-3. List available workflows:
+The `--bind` flag ensures files created in the Docker container persist to your local filesystem in `artifact-preview/` and `soundcloud-downloader/tracks/`.
+
+**Note:** The artifact upload step will fail in local testing (expected behavior), but all track files will still be downloaded and available locally.
+
+## Runner Scripts
+
+The `runner/` directory contains helpful npm scripts for local development and testing:
+
 ```bash
-act -l
+cd runner
+
+# Run full workflow locally (with Docker/act)
+npm test
+
+# Run workflow steps directly (without Docker)
+npm run test:local
+
+# Clean generated files (keeps .gitkeep)
+npm run cleanup
+
+# Clean everything including node_modules
+npm run cleanup:all
 ```
 
-4. Run specific job:
-```bash
-act -j download
-```
+### Available Scripts
+
+- **`npm test`** - Runs the GitHub Actions workflow locally using act with bind mount
+- **`npm run test:push`** - Tests the workflow with push trigger
+- **`npm run test:local`** - Executes workflow steps directly on host (no Docker)
+- **`npm run cleanup`** - Removes client_id.txt, tracks/, and artifact-preview/* files
+- **`npm run cleanup:all`** - Full cleanup including all node_modules directories
 
 ## How It Works
 
-1. **Token Extraction**: The script launches a headless WebKit browser using Playwright, navigates to https://soundcloud.com/, monitors network requests, and extracts the `client_id` parameter
-2. **User Track Fetching**: Uses the SoundCloud API with the extracted token to fetch all tracks for a specified user
-3. **Metadata Download**: For each track, downloads the title, description, artwork URL, duration, play count, and other metadata
-4. **Artifact Creation**: Saves all track data as JSON files and packages them as a GitHub Actions artifact for download
+1. **Token Extraction**: The script launches a headless WebKit browser using Playwright, navigates to https://soundcloud.com/, monitors network requests, and extracts the `client_id` parameter from API calls
+2. **User Resolution**: Uses the SoundCloud API with the extracted token to resolve the username to a user ID
+3. **Track Fetching**: Fetches all tracks for the specified user via the SoundCloud API v2
+4. **Metadata Download**: For each track, downloads the title, description, artwork URL, duration, play count, and other metadata
+5. **File Creation**: Saves each track as an individual JSON file plus a `_summary.json` index file
+6. **Artifact Upload**: In GitHub Actions, packages all files as a downloadable artifact
+
+### Performance Optimizations
+
+- **Apt Package Caching**: System dependencies are cached to speed up Playwright browser installation
+- **Bind Mounting**: When testing locally with act, `--bind` mode ensures files persist to the host filesystem
+- **Artifact Preview**: Files are copied to `artifact-preview/` directory for local inspection before upload
 
 ## Scripts
 
@@ -170,6 +212,14 @@ act -j download
 ### soundcloud-downloader/package.json
 
 - `npm run download` - Download track metadata (requires SOUNDCLOUD_USER env variable)
+
+### runner/package.json
+
+- `npm test` - Run workflow locally with act (bind mount mode)
+- `npm run test:push` - Test workflow with push trigger
+- `npm run test:local` - Run workflow steps directly without Docker
+- `npm run cleanup` - Remove generated files
+- `npm run cleanup:all` - Full cleanup including node_modules
 
 ## Output Format
 
