@@ -51,20 +51,24 @@ ${permalink_url}`;
 function pretty_playlist(description){
   if (!description) return '';
   
-  // Apply corrections from corrections.json
   let result = description;
-  for (const [wrong, correct] of Object.entries(corrections)) {
-    result = result.replace(new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), correct);
-  }
   
   // Remove "Tracklist:" prefix if present
   result = result.replace(/^Tracklist:\s*/i, '');
   
-  // Normalize "OF THE MONTH" tag spacing first (handle multiple spaces)
+  // Fix common misspellings in month tags (MOTNH -> MONTH)
+  result = result.replace(/\[(TRACK|CLASSIC|RECORD)\s+OF\s+THE\s+MOTNH\]/gi, '[$1 OF THE MONTH]');
+  
+  // Normalize "OF THE MONTH" tag spacing and ensure proper case
   result = result.replace(
     /\[(TRACK|CLASSIC|RECORD)\s+OF\s+THE\s+MONTH\]/gi,
     (match, type) => `[${type.toUpperCase()} OF THE MONTH]`
   );
+  
+  // Apply corrections from corrections.json
+  for (const [wrong, correct] of Object.entries(corrections)) {
+    result = result.replace(new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), correct);
+  }
   
   // First regex: Format track numbers and add quotes around track titles
   // Handles lines with parentheses or brackets (remix/label info)
