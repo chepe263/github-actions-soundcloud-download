@@ -115,9 +115,12 @@ function pretty_playlist(description){
   result = result.replace(
     /^(\d+\..*?)(\s*\[(TRACK|CLASSIC|RECORD) OF THE MONTH\])$/gm,
     (match, trackLine, tag) => {
-      return `\n${tag.trim()}\n${trackLine}`;
+      return `\n${tag.trim()}\n${trackLine}\n`;
     }
   );
+  
+  // Clean up any double blank lines
+  result = result.replace(/\n\n\n+/g, '\n\n');
   
   return result;
 }
