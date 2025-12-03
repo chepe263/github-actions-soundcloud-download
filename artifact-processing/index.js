@@ -47,31 +47,35 @@ function pretty_playlist(description){
   // Remove "Tracklist:" prefix if present
   let result = description.replace(/^Tracklist:\s*/i, '');
   
+  // Handle inline [TRACK/CLASSIC OF THE MONTH] tags - move to separate line before the track
+  result = result.replace(
+    /^(\d+\s+.*?)(\s*)(\[(TRACK|CLASSIC) OF THE MONTH\])/gm,
+    '$3\n$1'
+  );
+  
   // First regex: Format track numbers and add quotes around track titles
   // Handles lines with parentheses or brackets (remix/label info)
-  // Pattern: ^(\d+)\s(.*)(\s-\s)(.*?)(?= \(| \[)
-  // Replace: $1. $2$3"$4"
+  // Pattern: ^(\d+)\s(.*)(\s-\s|\s?-\s?)(.*?)(?= \(| \[)
   result = result.replace(
-    /^(\d+)\s(.*)(\s-\s)(.*?)(?= \(| \[)/gm,
+    /^(\d+)\s+(.*?)(\s?-\s?)(.*?)(?= \(| \[)/gm,
     (match, num, artist, sep, title) => {
       // Normalize spaces and fix "ft" to "ft."
-      const cleanArtist = artist.replace(/\s+/g, ' ').replace(/\bft\b/gi, 'ft.');
-      return `${num}. ${cleanArtist}${sep}"${title.trim()}"`;
+      const cleanArtist = artist.replace(/\s+/g, ' ').replace(/\bft\.?\b/gi, 'ft.');
+      return `${num}. ${cleanArtist} - "${title.trim()}"`;
     }
   );
   
   // Second regex: Format track numbers for lines WITHOUT parentheses or brackets
   // This catches older format lines that end after the track title
-  // Pattern: ^(\d+)\s(.*)(\s-\s)(.*)$
-  // Replace: $1. $2$3"$4"
+  // Pattern: ^(\d+)\s+(.*?)(\s?-\s?)(.*)$
   result = result.replace(
-    /^(\d+)\s(.*)(\s-\s)(.*)$/gm,
+    /^(\d+)\s+(.*?)(\s?-\s?)(.*)$/gm,
     (match, num, artist, sep, title) => {
       // Only apply if not already formatted (no period after number and no quotes)
       if (!match.includes('"') && !match.match(/^\d+\./)) {
         // Normalize spaces and fix "ft" to "ft."
-        const cleanArtist = artist.replace(/\s+/g, ' ').replace(/\bft\b/gi, 'ft.');
-        return `${num}. ${cleanArtist}${sep}"${title.trim()}"`;
+        const cleanArtist = artist.replace(/\s+/g, ' ').replace(/\bft\.?\b/gi, 'ft.');
+        return `${num}. ${cleanArtist} - "${title.trim()}"`;
       }
       return match;
     }
