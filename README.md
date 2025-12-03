@@ -8,9 +8,10 @@ This project uses GitHub Actions to:
 1. Extract the SoundCloud `client_id` token by monitoring network requests
 2. Fetch all tracks from a specified SoundCloud user
 3. Download metadata (title, description, etc.) for each track
-4. Save the data as a workflow artifact for easy download
+4. Process and format playlist descriptions into organized text files
+5. Upload formatted playlists as a workflow artifact
 
-Perfect for backing up your SoundCloud descriptions, analyzing track metadata, or archiving content.
+Perfect for backing up your SoundCloud playlists, creating readable tracklists, or archiving DJ mixes and radio shows.
 
 ## Project Structure
 
@@ -26,9 +27,14 @@ Perfect for backing up your SoundCloud descriptions, analyzing track metadata, o
 │   ├── download.js                 # Script to fetch track metadata
 │   ├── package.json                # Node.js dependencies
 │   └── tracks/                     # Downloaded track data (generated)
+├── artifact-processing/
+│   ├── index.js                    # Script to format playlists
+│   ├── package.json                # Node.js dependencies
+│   └── (processed files)           # Generated in workflow
 ├── artifact-preview/
 │   ├── .gitkeep                    # Preserves directory in git
-│   └── (track files)               # Local preview of downloaded tracks
+│   ├── (track files)               # Local preview of downloaded tracks
+│   └── out-playlists/              # Formatted playlists (generated)
 ├── runner/
 │   └── package.json                # Test and cleanup scripts
 ├── setup-act/
@@ -60,6 +66,10 @@ npm install
 # Install downloader dependencies
 cd ../soundcloud-downloader
 npm install
+
+# Install processing dependencies
+cd ../artifact-processing
+npm install
 ```
 
 3. Install Playwright browser (from soundcloud-token-getter directory):
@@ -90,6 +100,15 @@ node download.js username
 
 The track data will be saved to `soundcloud-downloader/tracks/`.
 
+Process playlists into formatted text files:
+
+```bash
+cd ../artifact-processing
+npm start
+```
+
+The formatted playlists will be saved to `artifact-preview/out-playlists/` organized by year and month.
+
 ### GitHub Actions
 
 The workflow automatically runs on:
@@ -101,7 +120,8 @@ The workflow will:
 1. Set up Node.js environment
 2. Extract the SoundCloud `client_id` token
 3. Download track metadata for the specified SoundCloud user
-4. Upload the data as a workflow artifact
+4. Process playlists into formatted text files organized by year/month
+5. Upload formatted playlists as a workflow artifact
 
 You can download the artifact from the Actions tab in your GitHub repository after the workflow completes.
 
@@ -131,8 +151,15 @@ After the workflow completes:
 1. Go to the Actions tab in your repository
 2. Click on the completed workflow run
 3. Scroll down to the "Artifacts" section
-4. Download the `soundcloud-tracks-*` artifact (ZIP file)
-5. Extract the ZIP to access all track JSON files
+4. Download the `soundcloud-playlists-*` artifact (ZIP file)
+5. Extract the ZIP to access formatted playlist text files organized by year and month
+
+The playlists are formatted with:
+- Track numbers followed by artist and title
+- Remix/label information in parentheses
+- Special tags like [TRACK OF THE MONTH] preserved
+- Monthly episodes: `YYYY-MM-MonthName.txt`
+- Best Of episodes: `YYYY-13-December (Best of YYYY).txt`
 
 ### Test Workflow Locally with act
 
@@ -194,7 +221,8 @@ npm run cleanup:all
 3. **Track Fetching**: Fetches all tracks for the specified user via the SoundCloud API v2
 4. **Metadata Download**: For each track, downloads the title, description, artwork URL, duration, play count, and other metadata
 5. **File Creation**: Saves each track as an individual JSON file plus a `_summary.json` index file
-6. **Artifact Upload**: In GitHub Actions, packages all files as a downloadable artifact
+6. **Playlist Processing**: Parses track descriptions, formats tracklists, and organizes into year/month text files
+7. **Artifact Upload**: In GitHub Actions, packages formatted playlists as a downloadable artifact
 
 ### Performance Optimizations
 
@@ -213,6 +241,11 @@ npm run cleanup:all
 
 - `npm run download` - Download track metadata (requires SOUNDCLOUD_USER env variable)
 
+### artifact-processing/package.json
+
+- `npm start` - Process playlists from JSON files into formatted text files
+- `npm run cleanup` - Remove generated out-playlists/ directory
+
 ### runner/package.json
 
 - `npm test` - Run workflow locally with act (bind mount mode)
@@ -222,6 +255,8 @@ npm run cleanup:all
 - `npm run cleanup:all` - Full cleanup including node_modules
 
 ## Output Format
+
+### JSON Metadata Files
 
 Each track is saved as a JSON file containing:
 - `id` - SoundCloud track ID
@@ -238,6 +273,33 @@ Each track is saved as a JSON file containing:
 - `artwork_url` - Cover art URL
 
 A `_summary.json` file is also created with an index of all downloaded tracks.
+
+### Formatted Playlist Files
+
+Playlists are organized by year and month in `out-playlists/`:
+
+```
+out-playlists/
+├── 2015/
+│   ├── 2015-01-January.txt
+│   ├── 2015-02-February.txt
+│   └── 2015-13-December (Best of 2015).txt
+├── 2016/
+│   └── ...
+└── ...
+```
+
+Each playlist file contains:
+- Header with episode title and SoundCloud URL
+- Formatted tracklist with proper numbering
+- Artist names and track titles
+- Remix/label information in parentheses
+- Special tags preserved (e.g., [TRACK OF THE MONTH])
+
+**Best Of Episodes:**
+- Use month number `13` to sort after December
+- Filename format: `YYYY-13-December (Best of YYYY).txt`
+- Separate header format for "Best Of" compilations
 
 ## License
 
