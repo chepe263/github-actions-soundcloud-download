@@ -113,10 +113,12 @@ function processPlaylists() {
     const titleLower = track.title.toLowerCase();
     const isBestOf = titleLower.includes('best of');
     
-    // Parse the created_at date
+    // Add 5 days to created_at to handle episodes uploaded at month end
     const createdDate = new Date(track.created_at);
+    createdDate.setDate(createdDate.getDate() + 5);
+    
     const year = createdDate.getFullYear();
-    // Use month 13 for Best Of episodes, otherwise use actual month
+    // Use month 13 for Best Of episodes, otherwise use adjusted date
     const month = isBestOf ? '13' : String(createdDate.getMonth() + 1).padStart(2, '0');
     const monthName = monthNames[createdDate.getMonth()];
     
