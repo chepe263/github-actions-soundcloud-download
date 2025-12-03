@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CLIENT_ID_FILE = path.join(__dirname, '../soundcloud-token-getter/client_id.txt');
-const OUTPUT_DIR = path.join(__dirname, 'tracks');
+const OUTPUT_DIR = path.join(__dirname, 'soundcloud-jsons');
 
 async function main() {
   // Get SoundCloud username from environment or default

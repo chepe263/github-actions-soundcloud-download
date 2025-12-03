@@ -140,7 +140,7 @@ vite.config.ts.timestamp-*
 
 # Generated output files
 soundcloud-token-getter/client_id.txt
-soundcloud-downloader/tracks/
+soundcloud-downloader/soundcloud-jsons/
 artifact-preview/*
 !artifact-preview/.gitkeep
 
