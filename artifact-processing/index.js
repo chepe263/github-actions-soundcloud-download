@@ -25,7 +25,7 @@ ${permalink_url}`;
 
 /**
  * Generates a formatted header for "Best Of" playlist files
- * @param {number} year - Year (e.g., 2017)
+ * @param {number} year - Year of the Best Of episode (e.g., 2018 for "Best Of 2018")
  * @param {string} permalink_url - SoundCloud track URL
  * @returns {string} Formatted header for Best Of edition
  */
@@ -110,11 +110,13 @@ function processPlaylists() {
     let year, month, monthName;
     
     if (isBestOf) {
-      // For Best Of episodes, extract year from title
+      // For Best Of episodes, extract year from title and place in following year's January
+      // (Best Of 2018 was the January 2019 episode)
       const yearMatch = track.title.match(/(\d{4})/);
-      year = yearMatch ? parseInt(yearMatch[1]) : new Date(track.created_at).getFullYear();
-      month = '13';
-      monthName = 'December';
+      const bestOfYear = yearMatch ? parseInt(yearMatch[1]) : new Date(track.created_at).getFullYear();
+      year = bestOfYear + 1;  // Place in following year
+      month = '01';
+      monthName = 'January';
     } else {
       // Add 2 days to created_at as initial guess
       const createdDate = new Date(track.created_at);
@@ -154,16 +156,16 @@ function processPlaylists() {
       fs.mkdirSync(yearDir, { recursive: true });
     }
     
-    // Create txt file with month name (add "-BestOf" suffix if it's a Best Of episode)
+    // Create txt file with month name
     const txtFileName = isBestOf 
-      ? `${year}-13-December (Best of ${year}).txt`
+      ? `${year}-01-January (Best of ${year - 1}).txt`
       : `${year}-${month}-${monthName}.txt`;
     const txtFilePath = path.join(yearDir, txtFileName);
     
     // Write header and formatted description to file
     const prettyDescription = pretty_playlist(track.description || '');
     const headerContent = isBestOf 
-      ? headerBestOf(year, track.permalink_url)
+      ? headerBestOf(year - 1, track.permalink_url)  // Pass the Best Of year (previous year)
       : header(monthName, year, track.permalink_url);
     const content = headerContent + '\n\n' + prettyDescription;
     
