@@ -21,19 +21,21 @@ Perfect for backing up your SoundCloud playlists, creating readable tracklists, 
 │   └── main.yml                    # GitHub Actions workflow
 ├── soundcloud-token-getter/
 │   ├── index.js                    # Playwright script to extract client_id
+│   ├── check-token.js              # Script to validate existing token
 │   ├── package.json                # Node.js dependencies
-│   └── client_id.txt               # Output file (generated)
+│   └── client_id.txt               # Output file (generated, cached)
 ├── soundcloud-downloader/
 │   ├── download.js                 # Script to fetch track metadata
 │   ├── package.json                # Node.js dependencies
-│   └── tracks/                     # Downloaded track data (generated)
+│   └── soundcloud-jsons/           # Downloaded track data (generated)
 ├── artifact-processing/
 │   ├── index.js                    # Script to format playlists
+│   ├── corrections.json            # Manual typo corrections
 │   ├── package.json                # Node.js dependencies
 │   └── (processed files)           # Generated in workflow
 ├── artifact-preview/
 │   ├── .gitkeep                    # Preserves directory in git
-│   ├── (track files)               # Local preview of downloaded tracks
+│   ├── soundcloud-json/            # Local preview of downloaded JSON files
 │   └── out-playlists/              # Formatted playlists (generated)
 ├── runner/
 │   └── package.json                # Test and cleanup scripts
@@ -211,22 +213,25 @@ npm run cleanup:all
 - **`npm test`** - Runs the GitHub Actions workflow locally using act with bind mount
 - **`npm run test:push`** - Tests the workflow with push trigger
 - **`npm run test:local`** - Executes workflow steps directly on host (no Docker)
-- **`npm run cleanup`** - Removes client_id.txt, tracks/, and artifact-preview/* files
+- **`npm run cleanup`** - Removes tracks/, out-playlists/, and soundcloud-json/* files (preserves client_id.txt)
 - **`npm run cleanup:all`** - Full cleanup including all node_modules directories
+- **`npm run zip`** - Creates a zip of all formatted playlists
 
 ## How It Works
 
-1. **Token Extraction**: The script launches a headless WebKit browser using Playwright, navigates to https://soundcloud.com/, monitors network requests, and extracts the `client_id` parameter from API calls
-2. **User Resolution**: Uses the SoundCloud API with the extracted token to resolve the username to a user ID
-3. **Track Fetching**: Fetches all tracks for the specified user via the SoundCloud API v2
-4. **Metadata Download**: For each track, downloads the title, description, artwork URL, duration, play count, and other metadata
-5. **File Creation**: Saves each track as an individual JSON file plus a `_summary.json` index file
-6. **Playlist Processing**: Parses track descriptions, formats tracklists, and organizes into year/month text files
-7. **Artifact Upload**: In GitHub Actions, packages formatted playlists as a downloadable artifact
+1. **Token Validation**: Checks if an existing `client_id.txt` is valid by testing it against the SoundCloud API
+2. **Token Extraction**: If no valid token exists, launches a headless WebKit browser using Playwright, navigates to https://soundcloud.com/, monitors network requests, and extracts the `client_id` parameter from API calls
+3. **User Resolution**: Uses the SoundCloud API with the extracted token to resolve the username to a user ID
+4. **Track Fetching**: Fetches all tracks for the specified user via the SoundCloud API v2
+5. **Metadata Download**: For each track, downloads the title, description, artwork URL, duration, play count, and other metadata
+6. **File Creation**: Saves each track as an individual JSON file plus a `_summary.json` index file
+7. **Playlist Processing**: Parses track descriptions, formats tracklists, and organizes into year/month text files
+8. **Artifact Upload**: In GitHub Actions, packages formatted playlists as a downloadable artifact
 
 ### Performance Optimizations
 
-- **Apt Package Caching**: System dependencies are cached to speed up Playwright browser installation
+- **Token Caching**: The `client_id` is cached in `client_id.txt` and reused if still valid, skipping Playwright browser installation
+- **Apt Package Caching**: System dependencies are cached to speed up Playwright browser installation when needed
 - **Bind Mounting**: When testing locally with act, `--bind` mode ensures files persist to the host filesystem
 - **Artifact Preview**: Files are copied to `artifact-preview/` directory for local inspection before upload
 
@@ -236,6 +241,7 @@ npm run cleanup:all
 
 - `npm start` - Run the token extraction script
 - `npm run get-token` - Alias for npm start
+- `npm run check-token` - Validate existing token against SoundCloud API
 
 ### soundcloud-downloader/package.json
 
@@ -251,7 +257,8 @@ npm run cleanup:all
 - `npm test` - Run workflow locally with act (bind mount mode)
 - `npm run test:push` - Test workflow with push trigger
 - `npm run test:local` - Run workflow steps directly without Docker
-- `npm run cleanup` - Remove generated files
+- `npm run zip` - Create zip of all formatted playlists
+- `npm run cleanup` - Remove generated files (preserves client_id.txt for caching)
 - `npm run cleanup:all` - Full cleanup including node_modules
 
 ## Output Format

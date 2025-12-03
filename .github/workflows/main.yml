@@ -24,7 +24,14 @@ jobs:
       working-directory: ./soundcloud-token-getter
       run: npm ci
     
+    - name: Check if existing client_id is valid
+      id: check_token
+      working-directory: ./soundcloud-token-getter
+      run: npm run check-token
+      continue-on-error: true
+    
     - name: Install Playwright Browsers
+      if: steps.check_token.outcome != 'success'
       working-directory: ./soundcloud-token-getter
       run: npx playwright install --with-deps webkit
     

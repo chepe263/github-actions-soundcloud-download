@@ -8,7 +8,7 @@
     "test:push": "cd .. && mkdir -p /tmp/soundcloud-act-cache/apt-cache /tmp/soundcloud-act-cache/apt-lists && act push --bind --container-architecture linux/amd64 --container-options '-v /tmp/soundcloud-act-cache/apt-cache:/var/cache/apt/archives -v /tmp/soundcloud-act-cache/apt-lists:/var/lib/apt/lists'",
     "test:local": "npm run cleanup && cd ../soundcloud-token-getter && npm install && node index.js && cd ../soundcloud-downloader && npm install && node download.js euphonicsessions && cd .. && mkdir -p artifact-preview/soundcloud-json && cp -r soundcloud-downloader/tracks/* artifact-preview/soundcloud-json/ && echo '\nFiles created in artifact-preview/soundcloud-json:' && ls -lah artifact-preview/soundcloud-json/ | head -20",
     "zip": "cd ../artifact-preview/out-playlists && zip -r ../playlists.zip . && echo '\nZip created: artifact-preview/playlists.zip'",
-    "cleanup": "rm -rf ../soundcloud-token-getter/client_id.txt ../soundcloud-downloader/tracks ../artifact-preview/out-playlists ../artifact-preview/playlists.zip ../artifact-preview/soundcloud-json/* && git checkout ../artifact-preview/.gitkeep",
+    "cleanup": "rm -rf ../soundcloud-downloader/tracks ../artifact-preview/out-playlists ../artifact-preview/playlists.zip ../artifact-preview/soundcloud-json/* && git checkout ../artifact-preview/.gitkeep",
     "cleanup:all": "npm run cleanup && rm -rf ../soundcloud-token-getter/node_modules ../soundcloud-downloader/node_modules ../node_modules"
   },
   "keywords": [

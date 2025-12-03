@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "get-token": "node index.js",
+    "check-token": "node check-token.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
