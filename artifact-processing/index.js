@@ -12,15 +12,12 @@ const monthNames = [
 
 /**
  * Generates a formatted header for a playlist file
- * @param {string} created_at - ISO 8601 date string
+ * @param {string} monthName - Month name (e.g., "January")
+ * @param {number} year - Year (e.g., 2025)
  * @param {string} permalink_url - SoundCloud track URL
  * @returns {string} Formatted header with title, date, and URL
  */
-function header(created_at, permalink_url){
-  const date = new Date(created_at);
-  const monthName = monthNames[date.getMonth()];
-  const year = date.getFullYear();
-  
+function header(monthName, year, permalink_url){
   return `Euphonic Sessions with Kyau & Albert
 ${monthName} ${year} Edition
 ${permalink_url}`;
@@ -28,14 +25,11 @@ ${permalink_url}`;
 
 /**
  * Generates a formatted header for "Best Of" playlist files
- * @param {string} created_at - ISO 8601 date string
+ * @param {number} year - Year (e.g., 2017)
  * @param {string} permalink_url - SoundCloud track URL
  * @returns {string} Formatted header for Best Of edition
  */
-function headerBestOf(created_at, permalink_url){
-  const date = new Date(created_at);
-  const year = date.getFullYear();
-  
+function headerBestOf(year, permalink_url){
   return `Euphonic Sessions with Kyau & Albert
 Best Of ${year}
 ${permalink_url}`;
@@ -113,14 +107,46 @@ function processPlaylists() {
     const titleLower = track.title.toLowerCase();
     const isBestOf = titleLower.includes('best of');
     
-    // Add 5 days to created_at to handle episodes uploaded at month end
-    const createdDate = new Date(track.created_at);
-    createdDate.setDate(createdDate.getDate() + 5);
+    let year, month, monthName;
     
-    const year = createdDate.getFullYear();
-    // Use month 13 for Best Of episodes, otherwise use adjusted date
-    const month = isBestOf ? '13' : String(createdDate.getMonth() + 1).padStart(2, '0');
-    const monthName = monthNames[createdDate.getMonth()];
+    if (isBestOf) {
+      // For Best Of episodes, extract year from title
+      const yearMatch = track.title.match(/(\d{4})/);
+      year = yearMatch ? parseInt(yearMatch[1]) : new Date(track.created_at).getFullYear();
+      month = '13';
+      monthName = 'December';
+    } else {
+      // Add 2 days to created_at as initial guess
+      const createdDate = new Date(track.created_at);
+      createdDate.setDate(createdDate.getDate() + 2);
+      
+      // Try to extract month from title
+      const titleMatch = track.title.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b/i);
+      
+      if (titleMatch) {
+        const titleMonthName = titleMatch[1].charAt(0).toUpperCase() + titleMatch[1].slice(1).toLowerCase();
+        const titleYear = parseInt(titleMatch[2]);
+        const titleMonth = monthNames.indexOf(titleMonthName) + 1;
+        const createdMonth = createdDate.getMonth() + 1;
+        
+        // If title month differs from created_at month, use title
+        if (titleMonth !== createdMonth) {
+          monthName = titleMonthName;
+          year = titleYear;
+          month = String(titleMonth).padStart(2, '0');
+        } else {
+          // Same month, use created_at
+          year = createdDate.getFullYear();
+          month = String(createdMonth).padStart(2, '0');
+          monthName = monthNames[createdDate.getMonth()];
+        }
+      } else {
+        // No title match, use created_at with offset
+        year = createdDate.getFullYear();
+        month = String(createdDate.getMonth() + 1).padStart(2, '0');
+        monthName = monthNames[createdDate.getMonth()];
+      }
+    }
     
     // Create year folder
     const yearDir = path.join(outputDir, String(year));
@@ -137,8 +163,8 @@ function processPlaylists() {
     // Write header and formatted description to file
     const prettyDescription = pretty_playlist(track.description || '');
     const headerContent = isBestOf 
-      ? headerBestOf(track.created_at, track.permalink_url)
-      : header(track.created_at, track.permalink_url);
+      ? headerBestOf(year, track.permalink_url)
+      : header(monthName, year, track.permalink_url);
     const content = headerContent + '\n\n' + prettyDescription;
     
     fs.writeFileSync(txtFilePath, content);
