@@ -111,6 +111,12 @@ function pretty_playlist(description){
     }
   );
   
+  // Add blank line before month tags for better readability
+  result = result.replace(
+    /^(\d+\..*)\n(\d+\..*\[(TRACK|CLASSIC|RECORD) OF THE MONTH\])/gm,
+    '$1\n\n$2'
+  );
+  
   return result;
 }
 
