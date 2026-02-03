@@ -2,6 +2,14 @@
 
 Automated SoundCloud song metadata downloader using GitHub Actions. Extracts the SoundCloud API token and downloads song descriptions for a specified user's tracks.
 
+# tl;dr
+
+go to the folder `runner` and use the terminal
+
+```
+$ npm run test
+```
+
 ## Overview
 
 This project uses GitHub Actions to:
