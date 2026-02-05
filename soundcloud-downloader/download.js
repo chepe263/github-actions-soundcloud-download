@@ -5,6 +5,48 @@ const path = require('path');
 const CLIENT_ID_FILE = path.join(__dirname, '../soundcloud-token-getter/client_id.txt');
 const OUTPUT_DIR = path.join(__dirname, 'soundcloud-jsons');
 
+// Create axios instance with browser-like headers
+const axiosInstance = axios.create({
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://soundcloud.com/',
+    'Origin': 'https://soundcloud.com'
+  }
+});
+
+// Helper function for delay
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Helper function for retry with exponential backoff
+async function retryRequest(fn, maxRetries = 3) {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Check if it's a captcha/rate limit error
+      if (error.response && (error.response.status === 403 || error.response.status === 429)) {
+        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 30000);
+        console.log(`⚠ Rate limited or CAPTCHA detected. Waiting ${Math.round(waitTime)}ms before retry ${attempt}/${maxRetries}...`);
+        await delay(waitTime);
+      } else if (attempt < maxRetries) {
+        const waitTime = 1000 * attempt + Math.random() * 500;
+        console.log(`⚠ Request failed. Retrying in ${Math.round(waitTime)}ms (${attempt}/${maxRetries})...`);
+        await delay(waitTime);
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
 async function main() {
   // Get SoundCloud username from environment or default
   const username = process.env.SOUNDCLOUD_USER || process.argv[2];
@@ -35,27 +77,34 @@ async function main() {
   try {
     console.log(`\nFetching user: ${username}`);
     
-    // Resolve user
-    const userResponse = await axios.get('https://api-v2.soundcloud.com/resolve', {
-      params: {
-        url: `https://soundcloud.com/${username}`,
-        client_id: clientId
-      }
-    });
+    // Resolve user with retry logic
+    const userResponse = await retryRequest(() =>
+      axiosInstance.get('https://api-v2.soundcloud.com/resolve', {
+        params: {
+          url: `https://soundcloud.com/${username}`,
+          client_id: clientId
+        }
+      })
+    );
 
     const user = userResponse.data;
     console.log(`Found user: ${user.username} (ID: ${user.id})`);
     console.log(`Track count: ${user.track_count}`);
 
-    // Get user's tracks
+    // Add delay between requests
+    await delay(2000 + Math.random() * 2000);
+
+    // Get user's tracks with retry logic
     console.log('\nFetching tracks...');
-    const tracksResponse = await axios.get(`https://api-v2.soundcloud.com/users/${user.id}/tracks`, {
-      params: {
-        client_id: clientId,
-        limit: 200,
-        linked_partitioning: 1
-      }
-    });
+    const tracksResponse = await retryRequest(() =>
+      axiosInstance.get(`https://api-v2.soundcloud.com/users/${user.id}/tracks`, {
+        params: {
+          client_id: clientId,
+          limit: 200,
+          linked_partitioning: 1
+        }
+      })
+    );
 
     const tracks = tracksResponse.data.collection;
     console.log(`Downloaded ${tracks.length} tracks`);
@@ -91,6 +140,9 @@ async function main() {
       });
 
       console.log(`  ✓ ${track.title}`);
+      
+      // Add small delay between track processing to avoid hitting rate limits
+      await delay(100 + Math.random() * 200);
     }
 
     // Save summary file

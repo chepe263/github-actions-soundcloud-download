@@ -107,6 +107,9 @@ dist
 # Docusaurus cache and generated files
 .docusaurus
 
+# Ignore local test input for playlist prettier
+soundcloud-playlist-prettier-single/entrada.txt
+
 # Serverless directories
 .serverless/
 
@@ -144,6 +147,11 @@ soundcloud-downloader/soundcloud-jsons/
 artifact-preview/*
 !artifact-preview/.gitkeep
 playlists.zip
+
+# soundcloud-playlist-prettier-single
+soundcloud-playlist-prettier-single/entrada.txt
+soundcloud-playlist-prettier-single/output.txt
+soundcloud-playlist-prettier-single/output-*.txt
 
 # Act (local GitHub Actions testing)
 .actrc
