@@ -73,7 +73,8 @@ jobs:
         echo "Total playlists: $(find artifact-preview/out-playlists -type f -name '*.txt' | wc -l)"
     
     - name: Upload formatted playlists
-      if: always()
+      # act does not provide ACTIONS_RUNTIME_TOKEN, so skip artifact upload locally.
+      if: always() && !env.ACT
       uses: actions/upload-artifact@v4
       with:
         name: soundcloud-playlists-${{ inputs.soundcloud_user || vars.SOUNDCLOUD_USER || 'default' }}-${{ github.run_number }}
