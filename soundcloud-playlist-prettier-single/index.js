@@ -62,7 +62,7 @@ function pretty_playlist(description, strictSpacing = false){
         cleanTitle = '';
       }
       // Check if parentheses contain remix/mix keywords, 'Straight From DAT', or 'New V'
-      const remixKeywords = /\b(remix|mix|rework|edit|version|dub|remaster|update|bootleg|mashup|VIP|RMX|Respray|Reprint)\b|Straight From DAT|New V/i;
+      const remixKeywords = /\b(remix|mix|rework|edit|version|dub|remaster|update|bootleg|mashup|VIP|RMX|Respray|Reprint|Remake)\b|Straight From DAT|New V/i;
       if (parenPart && remixKeywords.test(parenContent)) {
         // It's a remix - keep parentheses outside quotes and ensure space before bracket
         return `${num}. ${cleanArtist} - "${cleanTitle}" ${parenPart.trim()} [`;
