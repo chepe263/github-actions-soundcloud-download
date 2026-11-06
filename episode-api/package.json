@@ -1,0 +1,22 @@
+{
+  "name": "episode-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "REST API autocontenida: URL de descarga, playlist formateado y job que descarga el MP3 y aplica etiquetas ID3",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:lowram": "node --max-old-space-size=64 --max-semi-space-size=2 server.js",
+    "resolve": "node scripts/resolve.js",
+    "fixture:download": "node scripts/fixture-download.js",
+    "fixture:serve": "node scripts/fixture-serve.js",
+    "tags": "node scripts/print-tags.js",
+    "test": "node test/smoke.js",
+    "test:lowram": "node test/lowram.js",
+    "test:reference": "node test/reference.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "ISC"
+}

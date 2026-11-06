@@ -10,6 +10,48 @@ go to the folder `runner` and use the terminal
 $ npm run test
 ```
 
+## Flujo recomendado (solo el episodio más reciente)
+
+Si lo único que necesitas es el playlist del último episodio listo para copiar, usa el
+script local sin dependencias:
+
+```bash
+cd soundcloud-latest-episode
+node index.js                 # URL de descarga directa + playlist formateado
+node index.js --audio         # además descarga el MP3 original (320 kbps) sin yt-dlp ni ffmpeg
+node index.js --clip          # además copia el texto al portapapeles
+node index.js --url-only      # solo la URL de descarga de la API
+```
+
+Resuelve el `client_id` desde `window.__sc_hydration` (ya no hace falta Playwright),
+obtiene el último episodio y su descripción, y resuelve el **enlace directo al MP3
+original de 320 kbps** desde el `<enclosure>` del feed del podcast (el HLS/AAC de la API
+queda como fallback). Después alimenta `parsePlaylist()` de
+`soundcloud-playlist-prettier-single`. Los archivos quedan en
+`artifact-preview/latest-episode/`.
+Ver [soundcloud-latest-episode/README.md](soundcloud-latest-episode/README.md) para el
+detalle de cómo cambió la API en 2026.
+
+> El pipeline completo de abajo (token getter → downloader de todos los tracks →
+> processing → artifact) sigue existiendo, pero ya no es necesario para este caso.
+
+## episode-api (REST API)
+
+Nuevo lado del proyecto: API REST autocontenida (Node 20+, `node:http`, **cero dependencias**)
+que sirve la URL del MP3 de 320 kbps y el playlist ya arreglado, y ofrece un *job* que
+descarga el MP3, le escribe las etiquetas ID3 y devuelve el archivo.
+
+```bash
+cd episode-api
+npm run resolve && npm run fixture:download
+npm start          # http://localhost:3000  -> /episode, /episode/tags, POST /jobs
+npm test           # prueba end-to-end contra el MP3 hosteado localmente
+```
+
+Toma el **podcast XML** como base del MP3, títulos y tags básicos, y **SoundCloud** para el
+playlist. Ver [episode-api/README.md](episode-api/README.md). Para hosts con RAM limitada:
+`DATA_ONLY=1 npm run start:lowram` (~37 MB RSS medidos).
+
 ## Overview
 
 This project uses GitHub Actions to:

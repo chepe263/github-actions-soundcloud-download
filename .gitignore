@@ -156,3 +156,8 @@ soundcloud-playlist-prettier-single/output-*.txt
 # Act (local GitHub Actions testing)
 .actrc
 .secrets
+
+# episode-api (archivos generados / pesados)
+episode-api/fixtures/*.mp3
+episode-api/jobs/
+episode-api/data/

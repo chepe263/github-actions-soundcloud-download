@@ -1,0 +1,17 @@
+{
+  "name": "soundcloud-latest-episode",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Obtiene el episodio mas reciente de Euphonic Sessions: su URL de descarga directa de la API y el playlist formateado",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "latest": "node index.js",
+    "audio": "node index.js --audio",
+    "url": "node index.js --url-only"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "ISC"
+}

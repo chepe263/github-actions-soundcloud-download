@@ -4,6 +4,13 @@
   "description": "Local testing and cleanup scripts for SoundCloud downloader",
   "main": "index.js",
   "scripts": {
+    "latest": "node ../soundcloud-latest-episode/index.js",
+    "latest:audio": "node ../soundcloud-latest-episode/index.js --audio",
+    "latest:url": "node ../soundcloud-latest-episode/index.js --url-only",
+    "api": "node ../episode-api/server.js",
+    "api:resolve": "node ../episode-api/scripts/resolve.js",
+    "api:tags": "node ../episode-api/scripts/print-tags.js",
+    "api:test": "cd ../episode-api && npm test",
     "test": "cd .. && bash setup-act/setup-act.sh && mkdir -p /tmp/soundcloud-act-cache/apt-cache /tmp/soundcloud-act-cache/apt-lists && act workflow_dispatch --bind --container-architecture linux/amd64 --container-options '-v /tmp/soundcloud-act-cache/apt-cache:/var/cache/apt/archives -v /tmp/soundcloud-act-cache/apt-lists:/var/lib/apt/lists'",
     "test:push": "cd .. && mkdir -p /tmp/soundcloud-act-cache/apt-cache /tmp/soundcloud-act-cache/apt-lists && act push --bind --container-architecture linux/amd64 --container-options '-v /tmp/soundcloud-act-cache/apt-cache:/var/cache/apt/archives -v /tmp/soundcloud-act-cache/apt-lists:/var/lib/apt/lists'",
     "test:local": "npm run cleanup && cd ../soundcloud-token-getter && npm install && node index.js && cd ../soundcloud-downloader && npm install && node download.js euphonicsessions && cd .. && mkdir -p artifact-preview/soundcloud-json && cp -r soundcloud-downloader/tracks/* artifact-preview/soundcloud-json/ && echo '\nFiles created in artifact-preview/soundcloud-json:' && ls -lah artifact-preview/soundcloud-json/ | head -20",

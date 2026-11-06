@@ -1,0 +1,49 @@
+{
+  "_comment": "Esquema alineado con los MP3 de referencia (ID3v2.4 + ID3v1, MediaMonkey). Editable en caliente con PUT /config/tags. Un valor vacío omite el frame. 'preserve' reinyunta frames del MP3 de origen. APIC es obligatorio y se descarga del <itunes:image> del podcast feed XML.",
+  "_descriptions": {
+    "TPE1": "Artista / intérprete principal",
+    "TPE2": "Artista del álbum / banda",
+    "TALB": "Álbum / nombre del programa",
+    "TIT2": "Título (Mes + Año + 'Edition')",
+    "TRCK": "Número de pista = base 250 + número de episodio",
+    "TORY": "Año de lanzamiento original",
+    "TDOR": "Fecha original ISO (YYYY-MM-DD) - MediaMonkey la muestra con el formato de fecha corta de Windows",
+    "TYER": "Año",
+    "TDRC": "Fecha de grabación (año)",
+    "USLT": "Lyrics: playlist completo (título, edición, URL y pistas formateadas)",
+    "APIC": "Carátula (front cover) desde <itunes:image> del podcast feed XML - SIEMPRE",
+    "TSSE": "Software de codificación (conservado del MP3 de origen)",
+    "TXXX:creation_time": "Fecha de creación del archivo (conservada del MP3 de origen)",
+    "TXXX:ORIGINAL_DATE_ISO": "Opcional: fecha ISO literal en un campo de texto (Custom en MediaMonkey). Vacío = no se escribe."
+  },
+  "version": "2.4",
+  "strip": true,
+  "preserve": [
+    "TSSE",
+    "TXXX:creation_time"
+  ],
+  "artwork": {
+    "_comment": "Normaliza el tamaño de las URLs de SoundCloud (-tNNNxNNN). '500x500' reproduce exactamente la carátula del archivo de Octubre (58952 bytes). Pon null para usar el href literal del feed (t3000x3000, ~754 KB).",
+    "size": "500x500"
+  },
+  "trackNumber": {
+    "_comment": "TRCK = base + episodeNumber. Referencia: 252 Ago, 253 Sep, 254 Oct, 255 Nov 2026. Con seed=5, Noviembre = 250+5 = 255; el siguiente episodio nuevo sera 256.",
+    "base": 250,
+    "seed": 5,
+    "episodeNumber": "auto"
+  },
+  "frames": {
+    "TPE1": "{artist}",
+    "TPE2": "{artist}",
+    "TALB": "{album}",
+    "TIT2": "{edition}",
+    "TRCK": "{trackNumber}",
+    "TORY": "{originalYear}",
+    "TDOR": "{originalDate}",
+    "TYER": "{originalYear}",
+    "TDRC": "{originalYear}",
+    "USLT": "{lyrics}",
+    "APIC": "{artworkUrl}",
+    "TXXX:ORIGINAL_DATE_ISO": ""
+  }
+}
