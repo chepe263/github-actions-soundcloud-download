@@ -22,6 +22,7 @@ const { createServer } = require('../server');
 const { getEpisode } = require('../lib/episode');
 const { CONFIG_FILE } = require('../lib/jobs');
 const id3 = require('../lib/id3');
+const cache = require('../lib/cache');
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -45,6 +46,7 @@ async function main() {
   const sample = path.join(FIXTURES, 'sample.mp3');
   assert.ok(fs.existsSync(sample), 'Falta fixtures/sample.mp3 — ejecuta: npm run fixture:download');
   const originalConfig = fs.readFileSync(CONFIG_FILE, 'utf8');
+  cache.clear(); // caché frío y determinista para la prueba
 
   const fixture = createFixtureServer({ dir: FIXTURES });
   const fixturePort = await listen(fixture);
@@ -142,6 +144,7 @@ async function main() {
       await sleep(250);
     }
     assert.equal(job.status, 'ready', `job falló: ${job.error}`);
+    assert.ok(!job.cacheHit.mp3, 'con caché frío el primer job debe descargar');
     console.log(`✓ job listo: ${(job.bytes / 1024 / 1024).toFixed(1)} MB, ${Object.keys(job.tagsApplied).length} frames, tag=${job.tagBytes}B`);
     console.log(`  etiquetas de origen: ${JSON.stringify(job.sourceTags.tags)}`);
 
@@ -151,7 +154,8 @@ async function main() {
     assert.match(r.headers.get('content-disposition'), /prueba\.mp3/);
     assert.equal(r.body.subarray(0, 3).toString('latin1'), 'ID3');
 
-    const tagged = path.join(__dirname, `../jobs/${jobId}/episode.mp3`);
+    const tagged = job.file; // ahora apunta al caché de contenido
+    assert.ok(tagged && fs.existsSync(tagged), 'job.file debe existir');
     const parsedOut = await id3.readTagsFromFile(tagged);
     const back = id3.summarize(parsedOut);
     assert.equal(back.version, '2.4.0');
@@ -196,6 +200,41 @@ async function main() {
     r = await api(base, `/jobs/${jobId}`, { method: 'DELETE' });
     assert.equal(r.body.deleted, true);
     console.log('✓ DELETE /jobs/:id');
+
+    // ---- Caché de contenido ----
+    r = await api(base, '/cache');
+    assert.equal(r.status, 200);
+    assert.ok(r.body.entries >= 4, 'deben existir mp3+meta+carátula+etiquetado');
+    assert.equal(r.body.persistentByDefault, true);
+    console.log(`✓ GET /cache: ${r.body.entries} entradas, ${(r.body.totalBytes / 1024 / 1024).toFixed(1)} MB, persistente=${r.body.persistentByDefault}`);
+
+    // Segundo job idéntico: todo desde caché, sin red ni re-etiquetado.
+    r = await api(base, '/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceUrl: fixtureUrl, filename: 'prueba2.mp3' })
+    });
+    const job2Id = r.body.id;
+    let job2;
+    for (let i = 0; i < 60; i++) {
+      const status = await api(base, `/jobs/${job2Id}`);
+      job2 = status.body;
+      if (job2.status === 'ready' || job2.status === 'failed') break;
+      await sleep(250);
+    }
+    assert.equal(job2.status, 'ready', `segundo job falló: ${job2.error}`);
+    assert.equal(job2.cacheHit.mp3, true, 'el MP3 debe venir del caché');
+    assert.equal(job2.cacheHit.artwork, true, 'la carátula debe venir del caché');
+    assert.equal(job2.cacheHit.tagged, true, 'el MP3 etiquetado debe venir del caché');
+    assert.equal(job2.bytes, job.bytes);
+    console.log('✓ segundo job: 100% caché (sin descarga, sin carátula, sin re-etiquetar)');
+
+    // Borrar el job NO borra el contenido cacheado.
+    r = await api(base, `/jobs/${job2Id}`, { method: 'DELETE' });
+    assert.equal(r.body.deleted, true);
+    r = await api(base, '/cache');
+    assert.ok(r.body.entries >= 4, 'el caché debe sobrevivir al borrado del job');
+    console.log('✓ DELETE /jobs/:id conserva el caché de contenido');
 
     console.log('\n✅ Smoke test completo.');
   } finally {

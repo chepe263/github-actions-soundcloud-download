@@ -16,6 +16,8 @@
  *   POST /refresh                fuerza el resolver y actualiza data/episode.json
  *   GET  /config/tags            plantilla de etiquetas actual
  *   PUT  /config/tags            escribe la plantilla (correcciones)
+ *   GET  /cache                  estado del caché de contenido (persistente)
+ *   DELETE /cache                limpia el caché de contenido
  *   POST /tags/preview           vista previa de etiquetas con overrides
  *   POST /jobs                   crea job: descarga + ID3 + archivo listo
  *   GET  /jobs                   lista
@@ -28,6 +30,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const id3 = require('./lib/id3');
+const cache = require('./lib/cache');
 const { getEpisode, invalidateCache, loadCachedEpisode, DATA_FILE } = require('./lib/episode');
 const {
   createJob, getJob, listJobs, deleteJob,
@@ -144,21 +147,33 @@ function createServer(options = {}) {
   }
 
   const routes = {
-    'GET /health': async () => ({
-      ok: true,
-      node: process.version,
-      dataOnly: config.dataOnly,
-      dataFile: fs.existsSync(DATA_FILE) ? DATA_FILE : null,
-      rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
-      heapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
-    }),
+    'GET /health': async () => {
+      const c = cache.stats();
+      return {
+        ok: true,
+        node: process.version,
+        dataOnly: config.dataOnly,
+        dataFile: fs.existsSync(DATA_FILE) ? DATA_FILE : null,
+        cache: {
+          entries: c.entries,
+          totalMb: Math.round(c.totalBytes / 1024 / 1024),
+          persistent: c.persistentByDefault
+        },
+        rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        heapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+      };
+    },
+
+    'GET /cache': async () => cache.stats(),
+    'DELETE /cache': async () => ({ cleared: true, ...cache.clear() }),
 
     'GET /': async () => ({
       name: 'episode-api',
       endpoints: [
         'GET /health', 'GET /episode', 'GET /episode/playlist', 'GET /episode/download-url',
         'GET /episode/tags', 'POST /refresh', 'GET /config/tags', 'PUT /config/tags',
-        'POST /tags/preview', 'POST /jobs', 'GET /jobs', 'GET /jobs/:id',
+        'POST /tags/preview', 'GET /cache', 'DELETE /cache',
+        'POST /jobs', 'GET /jobs', 'GET /jobs/:id',
         'GET /jobs/:id/file', 'DELETE /jobs/:id'
       ]
     }),

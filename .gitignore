@@ -161,3 +161,4 @@ soundcloud-playlist-prettier-single/output-*.txt
 episode-api/fixtures/*.mp3
 episode-api/jobs/
 episode-api/data/
+episode-api/cache/

@@ -75,7 +75,9 @@ SoundCloud API v2
 | GET | `/jobs` | Lista de jobs |
 | GET | `/jobs/:id` | Estado, progreso, etiquetas de origen y aplicadas |
 | GET | `/jobs/:id/file` | **Descarga el MP3 etiquetado** (soporta `Range`) |
-| DELETE | `/jobs/:id` | Borra el job y su archivo |
+| DELETE | `/jobs/:id` | Borra el registro del job (**no** borra el caché) |
+| GET | `/cache` | Estado del caché de contenido (entradas, bytes, política) |
+| DELETE | `/cache` | Limpia el caché de contenido |
 
 CORS abierto (`Access-Control-Allow-Origin: *`) para el **frontend** que viene después.
 
@@ -232,6 +234,47 @@ Topes pensados para RAM/disco limitados:
 | `MAX_BODY_BYTES` | 1 MB | Tamaño máximo del body JSON |
 | `MAX_BYTES` | — | Recorta la descarga (pruebas) |
 
+## Caché de archivos
+
+Hay **dos niveles** y conviene no confundirlos:
+
+| Nivel | Dónde | ¿Se borra solo? | Para qué sirve |
+| --- | --- | --- | --- |
+| **Contenido** (lo caro) | `episode-api/cache/` | ❌ **No, por defecto nunca** | MP3 original, carátula y MP3 ya etiquetado |
+| Registros de job | `episode-api/jobs/` + mapa en memoria | ✅ 30 min / >5 jobs | Estado/progreso de cada job |
+| Resolver | `data/episode.json` | ❌ no | URL del MP3, playlist, metadatos del feed |
+| Estado | `data/track-counter.json` | ❌ no | Nº de episodio (no debe borrarse) |
+| Fixture | `fixtures/*.mp3` | ❌ no | MP3 local para pruebas |
+
+El caché de contenido está **clasificado por contenido**, no por job:
+
+```
+cache/
+├── mp3-<episodeId>.mp3        MP3 original descargado (276 MB)
+├── mp3-<episodeId>.mp3.json   sidecar: url, bytes, fetchedAt
+├── art-<hash-url>.jpg         carátula del <itunes:image> del feed
+└── tagged-<hash-spec>.mp3     MP3 etiquetado, dedup por episodio+config+carátula
+```
+
+Con esto, un **segundo job** con la misma configuración no toca la red ni vuelve a
+copiar/re-etiquetar 276 MB: `cacheHit: { mp3, artwork, tagged }`. `DELETE /jobs/:id`
+solo elimina el registro; los archivos siguen en `cache/`.
+
+Política por defecto: **persistente** (`CACHE_TTL_MS=0`, `CACHE_MAX_BYTES=0`). Si quieres
+limitarlo en un host con poco disco:
+
+| Variable | Default | Efecto |
+| --- | --- | --- |
+| `CACHE_DIR` | `episode-api/cache` | Ubicación |
+| `CACHE_TTL_MS` | `0` (nunca) | Borra entradas más viejas que el TTL |
+| `CACHE_MAX_BYTES` | `0` (sin límite) | Borra las más antiguas hasta bajar del tope |
+
+`DELETE /cache` limpia manualmente. Ojo: hacerlo (o activar un TTL corto) **pierde el
+ahorro de tiempo** — el siguiente job vuelve a bajar los 276 MB.
+
+> Antes de este cambio el MP3 descargado se borraba justo después de etiquetar y la salida
+> del job se borraba a los 30 min, así que cada job pagaba la descarga completa. Ya no.
+
 ## Fixture local (pruebas)
 
 Para no depender de SoundCloud en cada prueba:
@@ -258,6 +301,7 @@ episode-api/
 ├── lib/
 │   ├── id3.js                 # ID3v2 (lector/escritor), USLT, APIC, ID3v1, preserve
 │   ├── episode.js             # feed + SoundCloud -> data/episode.json
+│   ├── cache.js               # caché persistente de contenido (mp3/art/tagged)
 │   └── jobs.js                # cola de jobs, descarga, tagging, limpieza
 ├── scripts/
 │   ├── resolve.js             # resolver independiente
@@ -269,8 +313,9 @@ episode-api/
 │   ├── lowram.js              # arranque con heap de 64 MB
 │   └── reference.js           # comparación con los MP3 etiquetados a mano
 ├── fixtures/                  # MP3 descargado (gitignored)
-├── data/                      # episode.json generado (gitignored)
-└── jobs/                      # salida de jobs (gitignored)
+├── data/                      # episode.json + contador (gitignored)
+├── cache/                     # caché de contenido, persistente (gitignored)
+└── jobs/                      # registros de jobs (gitignored)
 ```
 
 ## Pendiente

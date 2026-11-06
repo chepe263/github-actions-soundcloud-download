@@ -11,6 +11,7 @@ const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 
 const id3 = require('./id3');
+const cache = require('./cache');
 const { getEpisode } = require('./episode');
 const sc = require('../../soundcloud-latest-episode/soundcloud');
 
@@ -154,6 +155,8 @@ function createJob(options = {}) {
     sourceTags: null,
     tagsApplied: null,
     tagBytes: null,
+    cacheHit: {},
+    artwork: null,
     file: null,
     bytes: null,
     error: null,
@@ -240,12 +243,23 @@ async function run(job) {
   const sourceUrl = job.sourceUrl || process.env.MP3_SOURCE_URL || (episode.download && episode.download.url);
   if (!sourceUrl) throw new Error('No hay URL de MP3 (pasa sourceUrl o configura MP3_SOURCE_URL).');
 
-  update(job, { status: 'running', stage: 'downloading', sourceUrl });
-  const sourcePath = path.join(job.dir, 'source.mp3');
-  const downloaded = await downloadTo(sourceUrl, sourcePath, job);
+  // 1) MP3 de origen: caché persistente (evita bajar ~276 MB en cada job).
+  update(job, { stage: 'downloading', sourceUrl });
+  const mp3 = cache.readMp3(episode.id, sourceUrl);
+  let downloaded;
+  if (mp3.hit) {
+    downloaded = mp3.bytes;
+    job.cacheHit.mp3 = true;
+    console.log(`[job ${job.id}] MP3 desde caché (${(downloaded / 1024 / 1024).toFixed(1)} MB, sin descarga, ${mp3.fetchedAt})`);
+  } else {
+    downloaded = await downloadTo(sourceUrl, mp3.path, job);
+    cache.commitMp3(episode.id, sourceUrl, downloaded);
+    console.log(`[job ${job.id}] MP3 guardado en caché (${(downloaded / 1024 / 1024).toFixed(1)} MB)`);
+  }
+  const sourcePath = mp3.path;
   update(job, { progress: { bytes: downloaded, total: downloaded } });
 
-  // Leer e IMPRIMIR las etiquetas que trae el MP3 de origen.
+  // 2) Leer e IMPRIMIR las etiquetas que trae el MP3 de origen.
   update(job, { stage: 'reading-tags' });
   const parsed = await id3.readTagsFromFile(sourcePath);
   const sourceTags = id3.summarize(parsed);
@@ -255,33 +269,61 @@ async function run(job) {
   const preview = renderTagPreview(episode, job.tagsOverride);
   const frames = { ...preview.frames };
 
-  // La carátula es OBLIGATORIA y viene del <itunes:image> del podcast feed XML.
+  // 3) Carátula OBLIGATORIA, desde <itunes:image> del feed (con caché).
   const artworkUrl = frames.APIC;
   if (!artworkUrl || typeof artworkUrl !== 'string') {
     throw new Error('No hay URL de carátula (APIC) en la plantilla; es obligatoria.');
   }
   update(job, { stage: 'downloading-artwork', artworkUrl });
-  const artwork = await downloadArtwork(artworkUrl);
+  let artwork = cache.readArtwork(artworkUrl);
+  if (artwork) {
+    job.cacheHit.artwork = true;
+    console.log(`[job ${job.id}] carátula desde caché (${artwork.data.length} bytes)`);
+  } else {
+    artwork = await downloadArtwork(artworkUrl);
+    cache.putArtwork(artworkUrl, artwork.mimeType, artwork.data);
+    console.log(`[job ${job.id}] carátula descargada y cacheada (${artwork.data.length} bytes)`);
+  }
   frames.APIC = artwork;
   job.artwork = { url: artworkUrl, source: episode.artworkSource, mimeType: artwork.mimeType, bytes: artwork.data.length };
-  console.log(`[job ${job.id}] carátula: ${artwork.mimeType}, ${artwork.data.length} bytes (${episode.artworkSource})`);
 
-  update(job, { stage: 'tagging' });
-  const outPath = path.join(job.dir, 'episode.mp3');
-  const result = await id3.writeTagsToFile(sourcePath, outPath, frames, {
+  // 4) MP3 etiquetado: dedup por hash de (episodio + config + carátula).
+  //    Si ya existe, no se vuelve a copiar/re-etiquetar 276 MB.
+  const specFrames = Object.fromEntries(Object.entries(frames).map(([key, value]) => [
+    key,
+    value && Buffer.isBuffer(value.data)
+      ? `artwork:${crypto.createHash('sha256').update(value.data).digest('hex')}`
+      : value
+  ]));
+  const spec = {
+    episodeId: episode.id,
+    sourceUrl,
     version: preview.version,
     strip: preview.strip,
     preserve: preview.preserve,
+    frames: specFrames,
     id3v1: id3v1From(frames, episode)
-  });
+  };
+  const key = cache.taggedKey(spec);
+  let outPath = cache.getTagged(key);
+  if (outPath) {
+    job.cacheHit.tagged = true;
+    console.log(`[job ${job.id}] MP3 etiquetado desde caché (sin re-etiquetar)`);
+  } else {
+    update(job, { stage: 'tagging' });
+    const temp = cache.taggedTemp(key);
+    await id3.writeTagsToFile(sourcePath, temp, frames, {
+      version: preview.version,
+      strip: preview.strip,
+      preserve: preview.preserve,
+      id3v1: id3v1From(frames, episode)
+    });
+    outPath = cache.commitTagged(key, temp);
+  }
 
-  job.tagsApplied = Object.fromEntries(Object.entries(result.frames).map(([key, value]) => [
-    key,
-    value && Buffer.isBuffer(value.data) ? `[imagen ${value.mimeType}, ${value.data.length} bytes]` : value
-  ]));
-
-  // El source ya no hace falta: evita duplicar ~276 MB en disco.
-  fs.rmSync(sourcePath, { force: true });
+  const written = id3.summarize(await id3.readTagsFromFile(outPath));
+  job.tagsApplied = written.tags;
+  job.tagBytes = written.size + 10; // cabecera ID3v2 + cuerpo
 
   const bytes = fs.statSync(outPath).size;
   update(job, {
@@ -289,10 +331,10 @@ async function run(job) {
     stage: 'ready',
     file: outPath,
     bytes,
-    tagBytes: result.tagBytes,
     filename: job.filename || `${(episode.title || 'episode').replace(/[<>:"/\\|?*]/g, '_')}.mp3`
   });
-  console.log(`[job ${job.id}] ✓ listo (${(bytes / 1024 / 1024).toFixed(1)} MB, tag ${result.tagBytes} bytes, ${Object.keys(preview.frames).length} frames)`);
+  const hits = Object.keys(job.cacheHit).filter(name => job.cacheHit[name]);
+  console.log(`[job ${job.id}] ✓ listo (${(bytes / 1024 / 1024).toFixed(1)} MB, ${written.frameCount} frames)${hits.length ? ` · caché: ${hits.join(', ')}` : ''}`);
 }
 
 function getJob(id) {
@@ -313,8 +355,14 @@ function deleteJob(id) {
   return true;
 }
 
-/** Limpieza por TTL y por número máximo de jobs (ahorra disco). */
+/**
+ * Limpieza por TTL y número máximo de REGISTROS de job.
+ * Ojo: los archivos viven en el caché de contenido, así que esto NO borra
+ * el MP3 descargado ni el etiquetado. cache.sweep() es opcional y por defecto
+ * no borra nada (persistente).
+ */
 function prune() {
+  cache.sweep();
   const now = Date.now();
   const done = [...jobs.values()].filter(job => job.status === 'ready' || job.status === 'failed');
   for (const job of done) {
